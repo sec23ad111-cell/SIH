@@ -1,0 +1,62 @@
+name: Node.js CI
+
+# This workflow runs on every push to the main branch and every pull request
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # This job sets up and tests the backend server
+  server:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./server
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        cache-dependency-path: server/package-lock.json
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests # You will need to add a test script to your server/package.json
+      run: npm test
+
+  # This job sets up and tests the frontend client
+  client:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./client
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        cache-dependency-path: client/package-lock.json
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests # You will need to add a test script to your client/package.json
+      run: npm test
+
+    - name: Build production app # You will need a build script in your client/package.json
+      run: npm run build
