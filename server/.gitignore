@@ -1,0 +1,5 @@
+db.sqlite
+node_modules/
+npm_output.log
+node_output.log
+nodemon_output.log
