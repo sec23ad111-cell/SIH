@@ -4,6 +4,8 @@ const db = require("./database.js");
 const cors = require("cors");
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = 'your_jwt_secret';
 
 app.use(cors());
 app.use(express.json());
@@ -20,11 +22,31 @@ app.get("/", (req, res, next) => {
     res.json({"message":"Ok"})
 });
 
+// Middleware to verify JWT
+const authenticateJWT = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (authHeader) {
+        const token = authHeader.split(' ')[1];
+
+        jwt.verify(token, JWT_SECRET, (err, user) => {
+            if (err) {
+                return res.sendStatus(403);
+            }
+
+            req.user = user;
+            next();
+        });
+    } else {
+        res.sendStatus(401);
+    }
+};
+
 // API endpoints
 
 // Get all workers
-app.get("/api/workers", (req, res, next) => {
-    var sql = "select * from workers"
+app.get("/api/workers", authenticateJWT, (req, res, next) => {
+    var sql = "select id, name, email from workers"
     var params = []
     db.all(sql, params, (err, rows) => {
         if (err) {
@@ -39,8 +61,8 @@ app.get("/api/workers", (req, res, next) => {
 });
 
 // Get worker by id
-app.get("/api/workers/:id", (req, res, next) => {
-    var sql = "select * from workers where id = ?"
+app.get("/api/workers/:id", authenticateJWT, (req, res, next) => {
+    var sql = "select id, name, email from workers where id = ?"
     var params = [req.params.id]
     db.get(sql, params, (err, row) => {
         if (err) {
@@ -55,7 +77,7 @@ app.get("/api/workers/:id", (req, res, next) => {
 });
 
 // Create a new worker
-app.post("/api/workers/", (req, res, next) => {
+app.post("/api/workers/", authenticateJWT, (req, res, next) => {
     var errors=[]
     if (!req.body.password){
         errors.push("No password specified");
@@ -90,7 +112,7 @@ app.post("/api/workers/", (req, res, next) => {
 });
 
 // Update a worker
-app.put("/api/workers/:id", (req, res, next) => {
+app.put("/api/workers/:id", authenticateJWT, (req, res, next) => {
     if (req.body.password) {
         bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
             var data = {
@@ -143,7 +165,7 @@ app.put("/api/workers/:id", (req, res, next) => {
 });
 
 // Delete a worker
-app.delete("/api/workers/:id", (req, res, next) => {
+app.delete("/api/workers/:id", authenticateJWT, (req, res, next) => {
     db.run(
         'DELETE FROM workers WHERE id = ?',
         req.params.id,
@@ -157,7 +179,7 @@ app.delete("/api/workers/:id", (req, res, next) => {
 });
 
 // Get all attendees
-app.get("/api/attendees", (req, res, next) => {
+app.get("/api/attendees", authenticateJWT, (req, res, next) => {
     var sql = "select * from attendees"
     var params = []
     db.all(sql, params, (err, rows) => {
@@ -173,7 +195,7 @@ app.get("/api/attendees", (req, res, next) => {
 });
 
 // Check in
-app.post("/api/checkin/", (req, res, next) => {
+app.post("/api/checkin/", authenticateJWT, (req, res, next) => {
     var errors=[]
     if (!req.body.worker_id){
         errors.push("No worker_id specified");
@@ -205,7 +227,7 @@ app.post("/api/checkin/", (req, res, next) => {
 });
 
 // Check out
-app.post("/api/checkout/", (req, res, next) => {
+app.post("/api/checkout/", authenticateJWT, (req, res, next) => {
     var errors=[]
     if (!req.body.worker_id){
         errors.push("No worker_id specified");
@@ -264,9 +286,12 @@ app.post("/api/login/", (req, res, next) => {
 
         bcrypt.compare(req.body.password, row.password, function(err, result) {
             if (result) {
+                const accessToken = jwt.sign({ username: row.email, id: row.id }, JWT_SECRET);
                 res.json({
                     "message":"success",
-                    "data":row
+                    "data": {
+                        token: accessToken
+                    }
                 })
             } else {
                 res.status(401).json({"error":"Unauthorized"});
